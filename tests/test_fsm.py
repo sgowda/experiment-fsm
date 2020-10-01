@@ -2,7 +2,7 @@
 import unittest
 import time
 
-from fsm import FSM, ThreadedFSM, FSMTable, StateTransitions
+from experiment_fsm.fsm import FSM, ThreadedFSM, FSMTable, StateTransitions
 
 
 event1to2 = [False, True,  False, False, False, False, False, False]
@@ -52,50 +52,49 @@ class MockFSM(ThreadedFSM):
 
 
 class TestFSM(unittest.TestCase):
-    def setUp(self):
-        self.exp = MockFSM()
-
     def test_exp_fsm_output(self):
         """Experiment state sequence follows reference sequence"""
-        self.exp.run_sync()
+        self.exp = MockFSM()
+        self.exp.init()
+        self.exp.run()
         self.assertEqual(self.exp.event_log,
-            [('state1', 'event1to2', 1), ('state2', 'event2to3', 2), ('state3', 'event3to1', 3), 
+            [('state1', 'event1to2', 1), ('state2', 'event2to3', 2), ('state3', 'event3to1', 3),
              ('state1', 'event1to3', 4), ('state3', 'event3to2', 5), ('state2', 'stop', 7)])
 
-class ThreadedFSM(unittest.TestCase):
+class TestThreadedFSM(unittest.TestCase):
     def setUp(self):
         self.exp = MockFSM()
-            
+
     def test_thread_start(self):
         """Experiment FSM execution should run in a new thread and return when state sequence is complete."""
         self.exp.start()
         self.exp.join()
         self.assertEqual(self.exp.event_log,
-            [('state1', 'event1to2', 1), ('state2', 'event2to3', 2), ('state3', 'event3to1', 3), 
+            [('state1', 'event1to2', 1), ('state2', 'event2to3', 2), ('state3', 'event3to1', 3),
              ('state1', 'event1to3', 4), ('state3', 'event3to2', 5), ('state2', 'stop', 7)])
 
         self.assertEqual(self.exp.cycle_count, 7)
 
-    # def test_thread_stop(self):
-    #     """Experiment execution in remote thread should terminate when 'end_task' is called"""
-    #     # Experiment should never start if the initial state is None
-    #     exp = ThreadedFSM()
-    #     exp.state = None
-    #     exp.start()
-    #     exp.join()
-    #     self.assertEqual(exp.cycle_count, 0)
+    def test_thread_stop(self):
+        """Experiment execution in remote thread should terminate when 'end_task' is called"""
+        # Experiment should never start if the initial state is None
+        exp = ThreadedFSM()
+        exp.state = None
+        exp.start()
+        exp.join()
+        self.assertEqual(exp.cycle_count, 0)
 
-    #     exp = ThreadedFSM()
-    #     exp.state = "wait"
-    #     exp.start()
-    #     time.sleep(1)
-    #     exp.end_task()
+        exp = ThreadedFSM()
+        exp.state = "wait"
+        exp.start()
+        time.sleep(1)
+        exp.end_task()
 
-    #     # number of cycles should be about 60. Wide margin so that test always passes
-    #     # (not exact due to threading and imprecise timing)
-    #     margin = 20
-    #     self.assertTrue(exp.cycle_count > exp.fps - margin)
-    #     self.assertTrue(exp.cycle_count < exp.fps + margin)        
+        # number of cycles should be about 60. Wide margin so that test always passes
+        # (not exact due to threading and imprecise timing)
+        margin = 20
+        self.assertTrue(exp.cycle_count > exp.fps - margin)
+        self.assertTrue(exp.cycle_count < exp.fps + margin)
 
 if __name__ == '__main__':
     unittest.main()

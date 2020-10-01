@@ -13,9 +13,6 @@ import numpy as np
 
 from collections import OrderedDict
 
-min_per_hour = 60.
-sec_per_min = 60.
-
 
 class FSMTable(object):
     def __init__(self, **kwargs):
@@ -93,15 +90,17 @@ class FSM(object):
 
         # Timestamp for rough loop timing
         self.last_time = self.get_time()
-        self.cycle_count = 0        
+        self.cycle_count = 0
 
-    @property 
+        self.stop = False
+
+    @property
     def update_rate(self):
         '''
         Attribute for update rate of task. Using @property in case any future modifications
         decide to change fps on initialization
         '''
-        return 1./self.fps        
+        return 1./self.fps
 
     def print_to_terminal(self, *args):
         '''
@@ -110,7 +109,7 @@ class FSM(object):
         if len(args) == 1:
             print(args[0])
         else:
-            print(args)        
+            print(args)
 
     def init(self):
         '''Interface for child classes to run initialization code after object
@@ -119,7 +118,7 @@ class FSM(object):
 
     def run(self):
         '''
-        Generic method to run the finite state machine of the task. Code that needs to execute 
+        Generic method to run the finite state machine of the task. Code that needs to execute
         imediately before the task starts running in child classes should be of the form:
 
         def run(self):
@@ -130,16 +129,16 @@ class FSM(object):
                 clean up stuff
 
         The try block may or may not be necessary. For example, if you're opening a UDP port, you may want to always
-        close the socket whether or not the main loop executes properly so that you don't loose the 
-        reference to the socket. 
+        close the socket whether or not the main loop executes properly so that you don't lose the
+        reference to the socket.
         '''
 
         ## Initialize the FSM before the loop
         self.set_state(self.state)
-        
+
         while self.state is not None:
-            if self.debug: 
-                # allow ungraceful termination if in debugging mode so that pdb 
+            if self.debug:
+                # allow ungraceful termination if in debugging mode so that pdb
                 # can catch the exception in the appropriate place
                 self.fsm_tick()
             else:
@@ -147,7 +146,7 @@ class FSM(object):
                 try:
                     self.fsm_tick()
                 except:
-                    self.print_to_terminal("Error in FSM tick")
+                    self.print_to_terminal("Error in fsm_tick()")
                     self.state = None
                     self.terminated_in_error = True
 
@@ -157,7 +156,8 @@ class FSM(object):
 
                     self.print_to_terminal(self.termination_err.read())
                     self.termination_err.seek(0)
-        if self.verbose: print("end of FSM.run, task state is", self.state)
+        if self.verbose:
+            print("end of FSM.run(), task state is", self.state)
 
     def run_sync(self):
         self.init()
@@ -174,7 +174,7 @@ class FSM(object):
         self.exec_state_specific_actions(self.state)
 
         # Execute the commands which must run every loop, independent of the FSM state
-        # (e.g., running the BMI decoder)
+        # (e.g., grabbing sensor data, writing state variables to file)
         self._cycle()
 
         current_state = self.state
@@ -188,7 +188,7 @@ class FSM(object):
                 # trigger the transition for the event
                 self.trigger_event(event)
 
-                # stop searching for transition events (transition events must be 
+                # stop searching for transition events (transition events must be
                 # mutually exclusive for this FSM to function properly)
                 break
 
@@ -231,13 +231,13 @@ class FSM(object):
         None
         '''
         log = (self.state, event) not in self.log_exclude
-        if log:  
+        if log:
             self.event_log.append((self.state, event, self.get_time()))
 
         fsm_edges = self.status[self.state]
-        next_state = fsm_edges[event]            
-        self.set_state(next_state, log=log)        
-        
+        next_state = fsm_edges[event]
+        self.set_state(next_state, log=log)
+
     def set_state(self, condition, log=True):
         '''
         Change the state of the task
@@ -255,7 +255,7 @@ class FSM(object):
         self.start_time = self.get_time()
 
         if log:
-            self.state_log.append((condition, self.start_time))        
+            self.state_log.append((condition, self.start_time))
         self.state = condition
 
         self.start_state(condition)
@@ -277,7 +277,7 @@ class FSM(object):
         '''
         self.cycle_count += 1
         if self.fps > 0:
-            self.clock.tick(self.fps)   
+            self.clock.tick(self.fps)
 
     def iter_time(self):
         '''
@@ -294,7 +294,7 @@ class FSM(object):
         Print out the FSM of the task in a semi-readable form
         '''
         for state in cls.status:
-            print('When in state "%s"' % state) 
+            print('When in state "%s"' % state)
             for trigger_event, next_state in list(cls.status[state].items()):
                 print('\tevent "%s" moves the task to state "%s"' % (trigger_event, next_state))
 
@@ -305,7 +305,7 @@ class FSM(object):
         '''
         events_to_test = []
         for state in cls.status:
-            # make _start function 
+            # make _start function
             print('''def _start_%s(self): pass''' % state)
 
             # make _while function
@@ -325,10 +325,10 @@ class FSM(object):
         '''
         End the FSM gracefully on the next iteration by setting the task's "stop" flag.
         '''
-        self.stop = True      
+        self.stop = True
 
     def _test_stop(self, ts):
-        ''' 
+        '''
         FSM 'test' function. Returns the 'stop' attribute of the task
         '''
         return self.stop
@@ -343,8 +343,8 @@ class ThreadedFSM(FSM, threading.Thread):
     def start(self):
         '''
         From the python docs on threading.Thread:
-            Once a thread object is created, its activity must be started by 
-            calling the thread's start() method. This invokes the run() method in a 
+            Once a thread object is created, its activity must be started by
+            calling the thread's start() method. This invokes the run() method in a
             separate thread of control.
 
         Prior to the thread's start method being called, the secondary init function (self.init) is executed.
@@ -359,6 +359,6 @@ class ThreadedFSM(FSM, threading.Thread):
 
     def join(self):
         '''
-        Code to run before re-joining the FSM thread 
+        Code to run before re-joining the FSM thread
         '''
         threading.Thread.join(self)
